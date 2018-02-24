@@ -1,14 +1,67 @@
 # docufant
 
-A Clojure library designed to ... well, that part is up to you.
+A Clojure library to treat Postgresql as a document store.
 
 ## Usage
 
-FIXME
 
-## License
+```clojure
 
-Copyright © 2018 FIXME
+(require '[docufant.core :as doc])
+(require '[docufant.db :as db])
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+
+(def db-spec {:dbtype "postgresql" :dbname "my_doc_store" :user "user" :password "pass"})
+(doc/init! db-spec)
+
+(doc/create! :staff {:name "Agnes"
+                     :salary {:annual 50000}
+                              :pension 5000})
+; {:name "Agnes", :id [:user 1], ...}
+
+;; Set a default connection
+(db/set-default-connection! db-spec)
+
+(doc/create! :staff {:name "Bert" 
+                     :salary {:annual 10000}})
+; {:name "Bert", :id [:user 2], ...}
+
+(doc/create! :customer {:name "Edward"})
+; {:name "Edward", :id [:customer 3]}
+
+
+;; Select everything
+(doc/select nil [])
+; [{:name "Agnes" ...}
+   {:name "Bert" ...}
+   {:name "Edward" ...}]
+   
+   
+;; Select specific types
+(doc/select :customer [])
+; [{:name "Edward" ...}]
+
+
+;; Select by JSON operations
+(doc/select :staff [[:= [:salary :annual] 10000]])
+; [{:name "Bert" ...}]
+
+(doc/select :staff [[:has-keys :salary [:annual :pension]]])
+; [{:name "Agnes" ...}]
+
+;; Get a specific row
+(doc/get [:customer 3])
+; {:name "Edward" ...}
+
+```
+
+## TODO
+
+* Clojars
+* Documentation
+* User-specified indexes on jsonb queries. 
+* `<`, `>` and other value checks.
+* linking between documents.
+* Limit, offset and ordering
+* `swap!`
+* Callbacks by type read/write
