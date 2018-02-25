@@ -84,16 +84,16 @@
 
 (defmulti clause-handler (fn [op & args] op))
 
-(defmethod clause-handler :=
-  ([_ v] [(str "_data = ?") (pg/jsonb v)])
-  ([_ p v] [(str "_data " (pointer p) " ? = ?") (path p) (pg/jsonb v)]))
-
 (defmethod clause-handler :contains [_ v]
   [(str "_data @> ?") (pg/jsonb v)])
 
 (defmethod clause-handler :has-keys
   ([_ v] [(str "_data ??& ?") (pg/text-array v)])
   ([_ p v] [(str "_data " (pointer p) " ? ??& ?") (path p) (pg/text-array v)]))
+
+(defmethod clause-handler :default
+  ([op v] [(str "_data " (name op) " ?") (pg/jsonb v)])
+  ([op p v] [(str "_data " (pointer p) " ? " (name op) " ?") (path p) (pg/jsonb v)]))
 
 
 (defn format-sql [type clauses]

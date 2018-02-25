@@ -56,6 +56,16 @@
             (pg/jsonb 1)] (doc/clause-handler := [:a :b] 1)))
     )
 
+  (testing ">"
+    (is (= ["_data > ?"
+            (pg/jsonb 1)] (doc/clause-handler :> 1)))
+    (is (= ["_data -> ? > ?" "a"
+            (pg/jsonb 1)] (doc/clause-handler :> :a 1)))
+    (is (= ["_data #> ? > ?"
+            (pg/text-array [:a :b])
+            (pg/jsonb 1)] (doc/clause-handler :> [:a :b] 1)))
+    )
+
   (testing ":contains"
     (is (= ["_data @> ?" (pg/jsonb {:foo 1})] (doc/clause-handler :contains {:foo 1})))
     )
@@ -76,7 +86,7 @@
     ))
 
 (deftest test-queries
-  (testing "select"
+  (testing "equality"
     (let [i1 (doc/create! :test {:a 1 :name "i1"})
           i2 (doc/create! :test {:a {:b 2} :name "i2"})
           i3 (doc/create! :tess {:a {:b 2 :c {:z 1 :x 2}} :name "i3"})
@@ -94,6 +104,17 @@
 
       (is (= [i2 i3] (doc/select nil [[:contains {:a {:b 2}}]])))
       (is (= [i3] (doc/select :tess [[:contains {:a {:c {:z 1}}}]])))
+      ))
+
+  (testing "inequality"
+    (let [i1 (doc/create! :ordered {:a 1})
+          i2 (doc/create! :ordered {:a 2})
+          i3 (doc/create! :ordered {:a 3 :c {:d 10}})
+          i4 (doc/create! :ordered {:b 1})]
+      (is (= [] (doc/select :ordered [[:< :a 0]])))
+      (is (= [i1 i2] (doc/select :ordered [[:<= :a 2]])))
+      (is (= [i3] (doc/select :ordered [[:> :a 1]
+                                        [:> [:c :d] 5]])))
       ))
 
   (testing "get"
