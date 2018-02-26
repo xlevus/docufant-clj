@@ -6,44 +6,10 @@
 
 (def ^:private table-name (atom nil))
 
-(def gin-index-types #{:jsonb_path_ops :jsonb_ops})
 
-
-(defn init-tables! [db-spec {:keys [table force]}]
-  (j/execute!
-   db-spec
-   [(str "CREATE TABLE"
-         (if force nil " IF NOT EXISTS ")
-         (name table)
-         " (_id SERIAL PRIMARY KEY,"
-         "_type VARCHAR(100),"
-         "_data JSONB);")]))
-
-
-(defn init-gin! [db-spec {:keys [table force gin]}]
-  (j/execute!
-   db-spec
-   [(str "CREATE INDEX "
-         (if force nil " IF NOT EXISTS ")
-         "idx_"
-         (name table)
-         "_data ON "
-         (name table)
-         " USING GIN(_data "
-         (name gin)
-         ")")]))
-
-
-(defn init!
-  ([db-spec] (init! db-spec {:table :docufant
-                             :force false
-                             :gin :jsonb_path_ops}))
-  ([db-spec opts]
-   (reset! table-name (:table opts))
-   (init-tables! db-spec opts)
-
-   (when (contains? gin-index-types (:gin opts))
-     (init-gin! db-spec opts))))
+(defn init! [db-spec]
+  (db/create-tables! db-spec)
+  (db/create-gin-index! db-spec))
 
 
 (defn from-db-row [row]
@@ -57,20 +23,6 @@
                  (parse-string true))]
     (assoc data :id [type id])))
 
-
-(defn create!
-  ([type data] (create! (db/connection) type data))
-  ([db-spec type data]
-   (->> {:_type (name type) :_data (pg/jsonb data)}
-        (j/insert! db-spec @table-name)
-        (first)
-        (from-db-row))))
-
-(defn update!
-  ([id data] (update! (db/connection) id data))
-  ([db-spec [type id] data] (j/update! db-spec @table-name
-                                 {:_data (pg/jsonb data)}
-                                 ["_type = ? AND _id = ?" (name type) id])))
 
 (defn pointer [path]
   (if (and (coll? path) (> (count path) 1)) "#>" "->"))
@@ -96,10 +48,10 @@
   ([op p v] [(str "_data " (pointer p) " ? " (name op) " ?") (path p) (pg/jsonb v)]))
 
 
-(defn format-sql [type clauses]
+(defn format-sql [db-spec type clauses]
   (loop [rest clauses
          sql (str "SELECT * FROM "
-                  (name @table-name)
+                  (name (db/tablename db-spec))
                   (if (nil? type)
                     " WHERE true"
                     " WHERE _type = ?"))
@@ -112,18 +64,28 @@
                (concat params p)))
       )))
 
+(defn create! [db-spec type data]
+  (->> {:_type (name type) :_data (pg/jsonb data)}
+       (j/insert! db-spec (db/tablename db-spec))
+       (first)
+       (from-db-row)))
 
-(defn select
-  ([type clauses] (select (db/connection) type clauses))
-  ([db-spec type clauses] (->> (format-sql type clauses)
-                               (j/query db-spec)
-                               (map from-db-row))))
 
-(defn get
-  ([id] (get (db/connection) id))
-  ([db-spec [type id]] (some-> (j/query db-spec
-                                        [(str "SELECT * FROM "
-                                              (name @table-name)
-                                              " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
-                               (first)
-                               (from-db-row))))
+(defn update! [db-spec [type id] data]
+  (j/update! db-spec (db/tablename db-spec)
+             {:_data (pg/jsonb data)}
+             ["_type = ? AND _id = ?" (name type) id]))
+
+
+(defn select [db-spec type clauses]
+  (->> (format-sql db-spec type clauses)
+       (j/query db-spec)
+       (map from-db-row)))
+
+
+(defn get [db-spec [type id]]
+  (some-> (j/query db-spec
+                   [(str "SELECT * FROM " (name (db/tablename db-spec))
+                         " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
+          (first)
+          (from-db-row)))
