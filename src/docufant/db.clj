@@ -1,5 +1,7 @@
 (ns docufant.db
-  (:require [clojure.java.jdbc :as j]))
+  (:require [clojure.java.jdbc :as j]
+            [clojure.string :as string]
+            [docufant.postgres :as pg]))
 
 
 (def gin-index-types #{:jsonb_path_ops :jsonb_ops})
@@ -48,4 +50,24 @@
              " USING GIN(_data "
              (name gin)
              ")")]))))
+
+
+(defn indexname [path]
+  (if (coll? path)
+    (string/join "_" (map name path))
+    (name path)))
+
+
+(defn build-index [options {:keys [path type unique] :as index}]
+  (let [{:keys [force tablename]} (get-opts options)]
+    [(str "CREATE " (if unique "UNIQUE ") "INDEX "
+          (if force nil "IF NOT EXISTS ")
+          "idx_" (name tablename) (if type (str "__" (name type))) "__" (indexname path)
+          " ON " (name tablename) " (( _data " (pg/pointer-operator path) " '" (pg/json-path path) "' )) "
+          (if type (str "WHERE _type = '" (name type) "'"))
+          )]))
+
+
+(defn create-index! [options index]
+  (j/execute! (get-spec options)(build-index options index)))
 
