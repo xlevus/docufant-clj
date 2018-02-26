@@ -4,8 +4,6 @@
             [docufant.db :as db]
             [docufant.postgres :as pg]))
 
-(def ^:private table-name (atom nil))
-
 
 (defn init! [db-spec]
   (db/create-tables! db-spec)
@@ -48,10 +46,10 @@
   ([op p v] [(str "_data " (pointer p) " ? " (name op) " ?") (path p) (pg/jsonb v)]))
 
 
-(defn format-sql [db-spec type clauses]
+(defn format-sql [options type clauses]
   (loop [rest clauses
          sql (str "SELECT * FROM "
-                  (name (db/tablename db-spec))
+                  (name (db/get-opts options :tablename))
                   (if (nil? type)
                     " WHERE true"
                     " WHERE _type = ?"))
@@ -64,15 +62,15 @@
                (concat params p)))
       )))
 
-(defn create! [db-spec type data]
+(defn create! [options type data]
   (->> {:_type (name type) :_data (pg/jsonb data)}
-       (j/insert! db-spec (db/tablename db-spec))
+       (j/insert! (db/get-spec options) (db/get-opts options :tablename))
        (first)
        (from-db-row)))
 
 
-(defn update! [db-spec [type id] data]
-  (j/update! db-spec (db/tablename db-spec)
+(defn update! [options [type id] data]
+  (j/update! (db/get-spec options) (db/get-opts options :tablename)
              {:_data (pg/jsonb data)}
              ["_type = ? AND _id = ?" (name type) id]))
 
@@ -83,9 +81,9 @@
        (map from-db-row)))
 
 
-(defn get [db-spec [type id]]
-  (some-> (j/query db-spec
-                   [(str "SELECT * FROM " (name (db/tablename db-spec))
+(defn get [options [type id]]
+  (some-> (j/query (db/get-spec options)
+                   [(str "SELECT * FROM " (name (db/get-opts options :tablename))
                          " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
           (first)
           (from-db-row)))
