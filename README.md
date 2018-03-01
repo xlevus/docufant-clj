@@ -2,8 +2,11 @@
 
 [![master](https://img.shields.io/travis/xlevus/docufant-clj/master.svg?style=for-the-badge)](https://travis-ci.org/xlevus/docufant-clj)
 
-
 A Clojure library to treat Postgresql as a document store.
+
+
+[![Clojars Project](https://img.shields.io/clojars/v/docufant.svg?style=for-the-badge)](https://clojars.org/docufant)
+
 
 ## Usage
 
