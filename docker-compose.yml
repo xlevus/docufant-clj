@@ -1,0 +1,12 @@
+---
+version: '2.1'
+
+services:
+  postgres:
+    image: postgres:9.6
+    environment:
+      POSTGRES_USER: docufant
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: docufant_test
+    ports:
+      - "5432:5432"
