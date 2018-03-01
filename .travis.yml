@@ -1,0 +1,11 @@
+language: clojure
+
+services:
+  - postgresql
+
+addons:
+  postgresql: "9.6"
+
+before_script:
+  - psql -c "CREATE USER docufant PASSWORD 'password';" -U postgres
+  - psql -c "CREATE DATABASE docufant_test WITH OWNER docufant;" -U postgres
