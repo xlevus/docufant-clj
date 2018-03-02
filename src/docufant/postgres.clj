@@ -51,3 +51,15 @@
                               " ?")))
              (if path (json-path path))]))
    ))
+
+
+(defn query-reducer
+  ([[query & params] new-query]
+   (if (coll? new-query)
+     (cons (str query (first new-query))
+           (concat params (rest new-query)))
+     (cons (str query new-query)
+           params))))
+
+(defn reduce-q [q]
+  (reduce query-reducer [] q))

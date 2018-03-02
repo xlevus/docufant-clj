@@ -127,6 +127,12 @@
 
 
 (deftest postgres
+  (testing "reduce-q"
+    (is (= ["SELECT A"] (pg/reduce-q ["SELECT " "A"])))
+    (is (= ["SELECT a = ?" 11] (pg/reduce-q ["SELECT " ["a = ?" 11]])))
+    (is (= ["SELECT a = ? AND b = ?" 11 12]
+           (pg/reduce-q ["SELECT " ["a = ?" 11] " AND " ["b = ?" 12]])))
+    )
   (testing "json-subq"
     (is (= ["_data"] (pg/json-subq :_data nil)))
     (is (= ["(_data)::int"] (pg/json-subq :_data nil {:as Integer})))
