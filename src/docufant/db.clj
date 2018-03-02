@@ -6,7 +6,8 @@
 
 (def gin-index-types #{:jsonb_path_ops :jsonb_ops})
 (def default-opts {:tablename :docufant
-                   :gin :jsonb_path_ops})
+                   :gin :jsonb_path_ops
+                   :force false})
 
 
 (defn get-opts
@@ -58,14 +59,17 @@
     (name path)))
 
 
-(defn build-index [options {:keys [path type unique] :as index}]
-  (let [{:keys [force tablename]} (get-opts options)]
-    [(str "CREATE " (if unique "UNIQUE ") "INDEX "
-          (if force nil "IF NOT EXISTS ")
-          "idx_" (name tablename) (if type (str "__" (name type))) "__" (indexname path)
-          " ON " (name tablename) " (( _data " (pg/pointer-operator path) " '" (pg/json-path path) "' )) "
-          (if type (str "WHERE _type = '" (name type) "'"))
-          )]))
+(defn format-index [options index-name clause {:keys [unique type]}]
+  (let [{:keys [force tablename] :as opts} (get-opts options)]
+   (pg/reduce-q ["CREATE " (if unique "UNIQUE ") "INDEX "
+                (if force nil "IF NOT EXISTS ")
+                "idx_" (name tablename) (if type (str "__" (name type))) "__" index-name
+                " ON " (name tablename)
+                " ( "clause " )"
+                (if type [" WHERE _type = ?" type])])))
+
+
+(defn build-index [options {:keys [path type unique] :as index}] )
 
 
 (defn create-index! [options index]
