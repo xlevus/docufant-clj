@@ -37,22 +37,6 @@
            "_data JSONB);")])))
 
 
-(defn create-gin-index! [options]
-  (let [{:keys [gin force tablename]} (get-opts options)]
-    (when (contains? gin-index-types gin)
-      (j/execute!
-       (get-spec options)
-       [(str "CREATE INDEX "
-             (if force nil " IF NOT EXISTS ")
-             "idx_"
-             (name tablename)
-             "_data ON "
-             (name tablename)
-             " USING GIN(_data "
-             (name gin)
-             ")")]))))
-
-
 (defn indexname [path]
   (if (coll? path)
     (string/join "_" (map name path))
@@ -86,5 +70,6 @@
 
 
 (defn create-index! [options index]
-  (j/execute! (get-spec options)(build-index options index)))
+  (j/execute! (get-spec options)
+              (build-index options index)))
 

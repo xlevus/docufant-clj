@@ -5,9 +5,7 @@
             [docufant.postgres :as pg]))
 
 
-(defn init! [db-spec]
-  (db/create-tables! db-spec)
-  (db/create-gin-index! db-spec))
+(defn init! [db-spec] (db/create-tables! db-spec))
 
 
 (defn from-db-row [row]

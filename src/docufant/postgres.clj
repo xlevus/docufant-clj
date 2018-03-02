@@ -29,7 +29,9 @@
   ([key & keys] (text-array (cons key keys))))
 
 
-(defmulti format-cast (fn [t q] t))
+(defmulti format-cast
+  "Format a sql vector `q` to a cast of type `t`."
+  (fn [t q] t))
 
 (defmethod format-cast :default [t _] (throw (Exception. "Unknown type" t)))
 (defmethod format-cast nil [_ q] q)
