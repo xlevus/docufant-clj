@@ -8,8 +8,8 @@
 
 (def ^:dynamic *db-spec* {:dbtype "postgresql"
               :dbname "docufant_test"
-              :user "user"
-              :password "pass"})
+              :user "docufant"
+              :password "password"})
 
 
 (defn tables [f]
