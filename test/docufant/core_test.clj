@@ -124,3 +124,21 @@
       (is (= i1 (doc/get *db-spec* (:id i1))))
       (is (nil? (doc/get *db-spec* [:foo 1])))
       )))
+
+
+(deftest postgres
+  (testing "json-subq"
+    (is (= ["_data"] (pg/json-subq :_data nil)))
+    (is (= ["(_data)::int"] (pg/json-subq :_data nil {:as Integer})))
+
+    (is (= ["_data -> ?" "a"] (pg/json-subq :_data :a)))
+
+    (is (= ["(_data ->> ?)::int" "a"] (pg/json-subq :_data :a {:as Integer})))
+    (is (= ["(_data ->> ?)::int" "a"] (pg/json-subq :_data :a {:as Long})))
+    (is (= ["(_data ->> ?)::float" "a"] (pg/json-subq :_data :a {:as Double})))
+
+    (is (= ["_data #> ?" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b])))
+    (is (= ["(_data #>> ?)::int" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Integer})))
+    (is (= ["(_data #>> ?)::int" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Long})))
+    (is (= ["(_data #>> ?)::float" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Double})))
+    ))
