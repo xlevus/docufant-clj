@@ -61,15 +61,28 @@
 
 (defn format-index [options index-name clause {:keys [unique type]}]
   (let [{:keys [force tablename] :as opts} (get-opts options)]
-   (pg/reduce-q ["CREATE " (if unique "UNIQUE ") "INDEX "
-                (if force nil "IF NOT EXISTS ")
-                "idx_" (name tablename) (if type (str "__" (name type))) "__" index-name
-                " ON " (name tablename)
-                " ( "clause " )"
-                (if type [" WHERE _type = ?" type])])))
+    (pg/reduce-q ["CREATE " (if unique "UNIQUE ") "INDEX "
+                  (if force nil "IF NOT EXISTS ")
+                  "idx_" (name tablename) (if type (str "__" (name type))) "__" index-name
+                  " ON " (name tablename) " "
+                  clause
+                  (if type [" WHERE _type = ?" type])])))
 
 
-(defn build-index [options {:keys [path type unique] :as index}] )
+(defmulti build-index (fn [options {:keys [index-type]}] index-type))
+
+(defmethod build-index :gin [options {:keys [gin-type type]}]
+  (format-index options
+                "gin"
+                (str "USING GIN(_data " (name gin-type) ")")
+                {:type type}))
+
+
+(defmethod build-index nil [options {:keys [path unique type as]}]
+  (format-index options
+                (indexname path)
+                (pg/reduce-q ["((" (pg/json-subq :_data path {:as as}) "))"])
+                {:type type}))
 
 
 (defn create-index! [options index]
