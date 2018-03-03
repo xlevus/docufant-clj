@@ -14,7 +14,7 @@
 
 (defn tables [f]
   ;;(db/transaction
-   (doc/init! *db-spec*)
+   (db/create-tables! *db-spec*)
   (f)
   )
 

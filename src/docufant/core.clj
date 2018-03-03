@@ -5,9 +5,6 @@
             [docufant.postgres :as pg]))
 
 
-(defn init! [db-spec] (db/create-tables! db-spec))
-
-
 (defn from-db-row [row]
   (let [id (:_id row)
         type (-> row
@@ -18,16 +15,6 @@
                  (.getValue)
                  (parse-string true))]
     (assoc data :id [type id])))
-
-
-(defn pointer [path]
-  (if (and (coll? path) (> (count path) 1)) "#>" "->"))
-
-
-(defn path
-  ([] nil)
-  ([key] (if (coll? key) (apply path key) (name key)))
-  ([key & keys] (pg/text-array (cons key keys))))
 
 
 (defmulti clause-handler (fn [op & args] op))
@@ -62,14 +49,19 @@
                (concat params p)))
       )))
 
-(defn create! [options type data]
+(defn create!
+  "Creates a document of type `type` with body `data`.
+  Returns the created object, with the `:id` field set to `[type id]`"
+  [options type data]
   (->> {:_type (name type) :_data (pg/jsonb data)}
        (j/insert! (db/get-spec options) (db/get-opts options :tablename))
        (first)
        (from-db-row)))
 
 
-(defn update! [options [type id] data]
+(defn update!
+  "Update document"
+  [options [type id] data]
   (j/update! (db/get-spec options) (db/get-opts options :tablename)
              {:_data (pg/jsonb data)}
              ["_type = ? AND _id = ?" (name type) id]))
