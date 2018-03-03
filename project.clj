@@ -8,4 +8,6 @@
                  [org.clojure/java.jdbc "0.7.3"]
                  [org.postgresql/postgresql "42.1.4"]]
 
+  :plugins [[lein-codox "0.10.3"]]
+  :codox {:metadata {:doc/format :markdown}}
   :profiles {:test {:plugins [[com.jakemccrary/lein-test-refresh "0.19.0"]]}})

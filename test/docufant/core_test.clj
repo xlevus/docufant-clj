@@ -14,7 +14,7 @@
 
 (defn tables [f]
   ;;(db/transaction
-   (doc/init! *db-spec*)
+   (db/create-tables! *db-spec*)
   (f)
   )
 
@@ -124,3 +124,61 @@
       (is (= i1 (doc/get *db-spec* (:id i1))))
       (is (nil? (doc/get *db-spec* [:foo 1])))
       )))
+
+
+(deftest postgres
+  (testing "reduce-q"
+    (is (= ["SELECT A"] (pg/reduce-q ["SELECT " "A"])))
+    (is (= ["SELECT a = ?" 11] (pg/reduce-q ["SELECT " ["a = ?" 11]])))
+    (is (= ["SELECT a = ? AND b = ?" 11 12]
+           (pg/reduce-q ["SELECT " ["a = ?" 11] " AND " ["b = ?" 12]])))
+    )
+  (testing "json-subq"
+    (is (= ["_data"] (pg/json-subq :_data nil)))
+    (is (= ["(_data)::int"] (pg/json-subq :_data nil {:as Integer})))
+
+    (is (= ["_data -> ?" "a"] (pg/json-subq :_data :a)))
+
+    (is (= ["(_data ->> ?)::int" "a"] (pg/json-subq :_data :a {:as Integer})))
+    (is (= ["(_data ->> ?)::int" "a"] (pg/json-subq :_data :a {:as Long})))
+    (is (= ["(_data ->> ?)::float" "a"] (pg/json-subq :_data :a {:as Double})))
+
+    (is (= ["_data #> ?" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b])))
+    (is (= ["(_data #>> ?)::int" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Integer})))
+    (is (= ["(_data #>> ?)::int" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Long})))
+    (is (= ["(_data #>> ?)::float" (pg/json-path [:a :b])] (pg/json-subq :_data [:a :b] {:as Double})))
+    ))
+
+
+(deftest test-indexes
+  (testing "format-index"
+    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__name ON docufant clause"]
+           (db/format-index *db-spec* "name" "clause" {})))
+
+    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__test__typed ON docufant clause WHERE _type = ?"
+            :test]
+           (db/format-index *db-spec* "typed" "clause" {:type :test})))
+
+    (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS idx_docufant__unique ON docufant clause"]
+           (db/format-index *db-spec* "unique" "clause" {:unique true})))
+
+    (is (= ["CREATE INDEX idx_docufant__force ON docufant clause"]
+           (db/format-index {:force true
+                             :db-spec {}} "force" "clause" {})))
+
+    )
+
+  (testing "build-index-gin"
+    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__gin ON docufant USING GIN(_data jsonb_path_ops)"]
+           (db/build-index {} {:index-type :gin
+                               :gin-type :jsonb_path_ops}))))
+
+
+  (testing "build-index"
+    (is (= "CREATE INDEX IF NOT EXISTS idx_docufant__intdoc__a_b_c ON docufant (((_data #>> ?)::int)) WHERE _type = ?"
+           (first (db/build-index {} {:path [:a :b :c]
+                                      :unique true
+                                      :type :intdoc
+                                      :as Integer})))))
+
+  )
