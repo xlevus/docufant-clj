@@ -16,7 +16,7 @@
 
 
 (defn text-array [value]
-  (pgobject "text[]" (str "{" (str/join "," (map name value)) "}")))
+  (pgobject "text[]" (str "{" (str/join "," (map #(if (keyword %) (name %) %) value)) "}")))
 
 
 (defn pointer-operator [path]
@@ -25,7 +25,9 @@
 
 (defn json-path
   ([] nil)
-  ([key] (if (coll? key) (apply json-path key) (name key)))
+  ([key] (if (coll? key)
+           (apply json-path key)
+           (name key)))
   ([key & keys] (text-array (cons key keys))))
 
 
