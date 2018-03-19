@@ -3,27 +3,36 @@
             [docufant.postgres :as pg]))
 
 
-(defrecord JsonbPath [field path type]
+(defrecord JsonbPath [field path as-type]
   honeysql.format.ToSql
-  (to-sql [v] (let [path (if (< 1 (count path))
-                           path
-                           (first path))]
-                (pg/cast-handler type
-                                 (str (fmt/to-sql field)
-                                      (if path (str " "
-                                                    (if (coll? path) "#" "-")
-                                                    (if type ">>" ">")
-                                                    " "
-                                                    (fmt/to-sql (pg/json-path path)))))
-                                 ))))
+  (to-sql [v]
+    (let [path (if (< 1 (count path))
+                 path
+                 (first path))]
+      (pg/cast-handler
+       as-type
+       (str (fmt/to-sql field)
+            (if path (str " "
+                          (if (coll? path) "#" "-")
+                          (if as-type ">>" ">")
+                          " "
+                          (fmt/to-sql (pg/json-path path)))))
+       ))))
+
+
+(defn jsonb-path
+  ([field] (jsonb-path field nil nil))
+  ([field path] (jsonb-path field path nil))
+  ([field path type] (->JsonbPath field path type))
+  )
 
 
 (defn build-fn-handler [operator]
   (defmethod fmt/fn-handler (str "jsonb" operator)
-    ([op field value] (fmt/fn-handler op field (pg/jsonb value) nil))
-    ([_ [field & path] value type]
-     (str (fmt/to-sql (->JsonbPath field path type))
-          " " operator " " (fmt/to-sql value)))))
+    [_ field value]
+     (str (fmt/to-sql field) " " operator " "
+          (fmt/to-sql
+           (if (:as-type field) value (pg/jsonb value))))))
 
 
 (build-fn-handler "@>")
