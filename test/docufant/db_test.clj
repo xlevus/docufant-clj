@@ -3,38 +3,22 @@
             [clojure.test :as t :refer [deftest testing is]]))
 
 
-(def ^:dynamic *db-spec* [])
+(def ^:dynamic *db-spec* {})
 
 
-(deftest test-indexes
-  (testing "format-index"
-    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__name ON docufant clause"]
-           (db/format-index *db-spec* "name" "clause" {})))
+(deftest test-indexname
+  (is (= "dfidx_docufant_a_b"
+         (db/indexname {} {:path [:a :b] })))
 
-    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__test__typed ON docufant clause WHERE _type = ?"
-            :test]
-           (db/format-index *db-spec* "typed" "clause" {:type :test})))
+  (is (= "dfidx_docufant_a_b__gin"
+         (db/indexname {} {:path [:a :b]
+                           :index-type :gin})))
 
-    (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS idx_docufant__unique ON docufant clause"]
-           (db/format-index *db-spec* "unique" "clause" {:unique true})))
+  (is (= "dfidx_docufant_a_b__uniq"
+         (db/indexname {} {:path [:a :b]
+                           :unique true})))
 
-    (is (= ["CREATE INDEX idx_docufant__force ON docufant clause"]
-           (db/format-index {:force true
-                             :db-spec {}} "force" "clause" {})))
+  (is (= "dfidx_foo_a_b"
+         (db/indexname {:tablename "foo" :db-spec {}} {:path [:a :b] })))
 
-    )
-
-
-  (testing "build-index-gin"
-    (is (= ["CREATE INDEX IF NOT EXISTS idx_docufant__gin ON docufant USING GIN(_data jsonb_path_ops)"]
-           (db/build-index {} {:index-type :gin
-                               :gin-type :jsonb_path_ops}))))
-
-
-  (testing "build-index"
-    (is (= "CREATE INDEX IF NOT EXISTS idx_docufant__intdoc__a_b_c ON docufant (((_data #>> ?)::int)) WHERE _type = ?"
-           (first (db/build-index {} {:path [:a :b :c]
-                                      :unique true
-                                      :type :intdoc
-                                      :as Integer})))))
   )

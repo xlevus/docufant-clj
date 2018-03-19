@@ -1,7 +1,10 @@
 (ns docufant.db
   (:require [clojure.java.jdbc :as j]
             [clojure.string :as string]
-            [docufant.postgres :as pg]))
+            [honeysql.core :as sql]
+            [docufant.postgres :as pg]
+            [docufant.honeysql :refer [jsonb-path]]
+            [clojure.string :as str]))
 
 
 (def gin-index-types #{:jsonb_path_ops :jsonb_ops})
@@ -49,40 +52,24 @@
   [options]
   (j/execute! (get-spec options) (create-table-sql options)))
 
+(defn indexname [options {:keys [unique index-type path as]}]
+  (let [{:keys [tablename]} (get-opts options)]
+    (str "dfidx_"
+         (name tablename) "_"
+         (str/join "_" (map name path))
+         (if index-type (str "__" (name index-type)))
+         (if unique "__uniq")
+         )))
 
-(defn indexname
-  [path]
-  (if (coll? path)
-    (string/join "_" (map name path))
-    (name path)))
 
-
-(defn format-index
+(defn build-index
   "Formats the SQL for the given index."
-  [options index-name clause {:keys [unique type]}]
-  (let [{:keys [force tablename] :as opts} (get-opts options)]
-    (pg/reduce-q ["CREATE " (if unique "UNIQUE ") "INDEX "
-                  (if force nil "IF NOT EXISTS ")
-                  "idx_" (name tablename) (if type (str "__" (name type))) "__" index-name
-                  " ON " (name tablename) " "
-                  clause
-                  (if type [" WHERE _type = ?" type])])))
+  [options {:keys [unique name path type] :as index}]
 
-
-(defmulti build-index (fn [options {:keys [index-type]}] index-type))
-
-(defmethod build-index :gin [options {:keys [gin-type type]}]
-  (format-index options
-                "gin"
-                (str "USING GIN(_data " (name gin-type) ")")
-                {:type type}))
-
-
-(defmethod build-index nil [options {:keys [path unique type as]}]
-  (format-index options
-                (indexname path)
-                (pg/reduce-q ["((" (pg/json-subq :_data path {:as as}) "))"])
-                {:type type}))
+  {:create-index {:name (indexname options index)
+                  :on (jsonb-path :_data path)
+                  :unique unique}
+   :where (if type [:= :_type type] true)})
 
 
 (defn create-index!
@@ -102,4 +89,5 @@
     `docufant.postgres/format-cast`"
   [options index]
   (j/execute! (get-spec options)
-              (build-index options index)))
+              (-> (build-index options index)
+                  (sql/format))))
