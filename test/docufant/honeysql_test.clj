@@ -1,8 +1,9 @@
 (ns docufant.honeysql-test
-  (:require [docufant.honeysql :as df-honeysql]
+  (:require [docufant.honeysql :as dhoney]
             [docufant.postgres :as pg]
             [honeysql.core :as sql]
-            [clojure.test :as t :refer [deftest testing is]]))
+            [clojure.test :as t :refer [deftest testing is]])
+  (:use [docufant.honeysql]))
 
 
 (defn where [& clause]
@@ -35,3 +36,23 @@
            (where "jsonb=" [:data :a :b] 1 Long)))
 
     ))
+
+
+(deftest test-honeysql-create-index
+  (is (= ["CREATE INDEX IF NOT EXISTS indexname ON field"]
+      (sql/format {:create-index {:name :indexname
+                                  :on :field}})))
+
+  (is (= ["CREATE INDEX indexname ON field WHERE (data ->> ?)::int = ?"
+          "a" 1]
+         (sql/format {:create-index {:name :indexname
+                                     :force true
+                                     :on :field}
+                      :where ["jsonb=" [:data :a] 1 Long]})))
+
+  (is (= ["CREATE INDEX indexname ON (data #> ?)"
+          (pg/text-array [:a :b])]
+         (sql/format {:create-index {:name :indexname
+                                     :force true
+                                     :on (->JsonbPath :data [:a :b] nil)}})))
+  )
