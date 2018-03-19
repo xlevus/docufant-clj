@@ -37,12 +37,6 @@
      (str (json-path field path type) " " operator " " (fmt/to-sql value)))))
 
 
-;; (defmethod fmt/fn-handler "jsonb_="
-;;   ([op field value] (fmt/fn-handler op field (pg/jsonb value) nil))
-;;   ([_ [field & path] value type]
-;;    (str (json-path field path type) " = " (fmt/to-sql value))))
-
-
 (build-fn-handler "@>")
 (build-fn-handler "<@")
 (build-fn-handler "=")
