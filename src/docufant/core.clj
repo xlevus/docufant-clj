@@ -2,7 +2,8 @@
   (:require [clojure.java.jdbc :as j]
             [cheshire.core :refer [parse-string]]
             [docufant.db :as db]
-            [docufant.postgres :as pg]))
+            [docufant.postgres :as pg]
+            [honeysql.core :as sql]))
 
 
 (defn from-db-row [row]

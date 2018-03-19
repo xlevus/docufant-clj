@@ -17,15 +17,17 @@
   ([field] (fmt/to-sql field))
   ([field path] (json-path field path nil))
   ([field path type]
-   (println type)
-   (cast-handler type
-                 (str (fmt/to-sql field)
-                      (if path (str " "
-                                    (if (coll? path) "#" "-")
-                                    (if type ">>" ">")
-                                    " "
-                                    (fmt/to-sql (pg/json-path path)))))
-   )))
+   (let [path (if (< 1 (count path))
+                path
+                (first path))]
+     (cast-handler type
+                  (str (fmt/to-sql field)
+                       (if path (str " "
+                                     (if (coll? path) "#" "-")
+                                     (if type ">>" ">")
+                                     " "
+                                     (fmt/to-sql (pg/json-path path)))))
+                  ))))
 
 
 (defn build-fn-handler [operator]
