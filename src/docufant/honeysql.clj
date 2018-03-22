@@ -47,12 +47,15 @@
 
 
 (defmethod fmt/format-clause :create-index
-  [[op {:keys [name unique on force]}] sqlmap]
+  [[op {:keys [name unique on field force using]}] sqlmap]
   (str "CREATE "
        (if unique "UNIQUE ")
        "INDEX "
        (if (not force) "IF NOT EXISTS ")
        (fmt/to-sql name)
-       " ON " (fmt/to-sql on)))
+       " ON " (fmt/to-sql on)
+       (if using (str " USING " (fmt/to-sql using)))
+       (if field (str " (" (fmt/to-sql field) ")"))
+       ))
 
 (fmt/register-clause! :create-index 0)

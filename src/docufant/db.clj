@@ -65,16 +65,17 @@
 
 (defmulti index-target (fn [index] (:index-type index)))
 
-(defmethod index-target nil [{:keys [path]}] (jsonb-path :_data path))
-(defmethod index-target :gin [{:keys [gin-type]}] (sql/raw "gin(_data jsonb_ops)"))
+(defmethod index-target nil [{:keys [path]}] {:field (jsonb-path :_data path)})
+(defmethod index-target :gin [{:keys [gin-type]}] {:using (sql/raw "gin(_data jsonb_ops)")})
 
 
 (defn build-index
   "Formats the SQL for the given index."
   [options {:keys [unique path type as] :as index}]
-  {:create-index {:name (sql/raw (indexname options index))
-                  :on (index-target index)
-                  :unique unique}
+  {:create-index (merge {:name (sql/raw (indexname options index))
+                         :on (get-opts options :tablename)
+                         :unique unique}
+                        (index-target index))
    :where (if type [:= :_type (name type)] true)})
 
 

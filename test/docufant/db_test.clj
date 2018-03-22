@@ -32,13 +32,13 @@
 
 
 (deftest test-indexes
-  (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS dfidx_docufant_foo_bar_baz__uniq ON (_data #> ?) WHERE TRUE"
-          (pg/text-array [:foo :bar :baz])]
+  (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS dfidx_docufant_p_p__uniq ON docufant ((_data #> ?)) WHERE TRUE"
+          (pg/text-array [:p :p])]
          (-> (db/build-index *db-spec* {:unique true
-                                        :path [:foo :bar :baz]})
+                                        :path [:p :p]})
              (sql/format))))
 
-  (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant___gin__animal ON gin(_data jsonb_ops) WHERE _type = ?"
+  (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant___gin__animal ON docufant USING gin(_data jsonb_ops) WHERE _type = ?"
           "animal"]
          (-> (db/build-index *db-spec* {:index-type :gin
                                         :type :animal})

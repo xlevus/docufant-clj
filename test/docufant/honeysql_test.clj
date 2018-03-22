@@ -37,20 +37,29 @@
 
 
 (deftest test-honeysql-create-index
-  (is (= ["CREATE INDEX IF NOT EXISTS indexname ON field"]
+  (is (= ["CREATE INDEX IF NOT EXISTS indexname ON table (field)"]
       (sql/format {:create-index {:name :indexname
-                                  :on :field}})))
+                                  :on :table
+                                  :field :field}})))
 
-  (is (= ["CREATE INDEX indexname ON field WHERE (data ->> ?)::int = ?"
+  (is (= ["CREATE INDEX indexname ON table (field) WHERE (data ->> ?)::int = ?"
           "a" 1]
          (sql/format {:create-index {:name :indexname
                                      :force true
-                                     :on :field}
+                                     :on :table
+                                     :field :field}
                       :where ["jsonb=" (jsonb-path :data [:a] Long) 1]})))
 
-  (is (= ["CREATE INDEX indexname ON (data #> ?)"
+  (is (= ["CREATE INDEX indexname ON table ((data #> ?))"
           (pg/text-array [:a :b])]
          (sql/format {:create-index {:name :indexname
                                      :force true
-                                     :on (jsonb-path :data [:a :b])}})))
+                                     :on :table
+                                     :field (jsonb-path :data [:a :b])}})))
+
+  (is (= ["CREATE INDEX IF NOT EXISTS indexname ON table USING gin(field)"]
+         (sql/format {:create-index {:name :indexname
+                                     :on :table
+                                     :using (sql/raw "gin(field)")}})))
+
   )
