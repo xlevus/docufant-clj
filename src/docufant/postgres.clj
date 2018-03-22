@@ -19,10 +19,6 @@
   (pgobject "text[]" (str "{" (str/join "," (map #(if (keyword %) (name %) %) value)) "}")))
 
 
-(defn pointer-operator [path]
-  (if (and (coll? path) (> (count path) 1)) "#>" "->"))
-
-
 (defn json-path
   ([] nil)
   ([key] (if (coll? key)

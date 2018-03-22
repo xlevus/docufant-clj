@@ -3,6 +3,7 @@
             [cheshire.core :refer [parse-string]]
             [docufant.db :as db]
             [docufant.postgres :as pg]
+            [honeysql.helpers :as honeysql]
             [honeysql.core :as sql]))
 
 
@@ -17,38 +18,6 @@
                  (parse-string true))]
     (assoc data :id [type id])))
 
-
-(defmulti clause-handler (fn [op & args] op))
-
-(defmethod clause-handler :contains [_ v]
-  [(str "_data @> ?") (pg/jsonb v)])
-
-(defmethod clause-handler :has-keys
-  ([op v] (clause-handler op nil v))
-  ([op p v] (pg/reduce-q [(pg/json-subq :_data p)
-                          [(str " ??& ?") (pg/text-array v)]])))
-
-(defmethod clause-handler :default
-  ([op v] (clause-handler op nil v))
-  ([op p v] (pg/reduce-q [(pg/json-subq :_data p)
-                          [(str " " (name op) " ?") (pg/jsonb v)]])))
-
-
-(defn format-sql [options type clauses]
-  (loop [rest clauses
-         sql (str "SELECT * FROM "
-                  (name (db/get-opts options :tablename))
-                  (if (nil? type)
-                    " WHERE true"
-                    " WHERE _type = ?"))
-         params (if (nil? type) [] [(name type)])]
-    (if (empty? rest)
-      (cons sql params)
-      (let [[q & p] (apply clause-handler (first rest))]
-        (recur (next rest)
-               (str sql " AND " q)
-               (concat params p)))
-      )))
 
 (defn create!
   "Creates a document of type `type` with body `data`.
@@ -68,8 +37,17 @@
              ["_type = ? AND _id = ?" (name type) id]))
 
 
-(defn select [db-spec type clauses]
-  (->> (format-sql db-spec type clauses)
+(defn build-sqlmap [options type clauses]
+  (apply honeysql/merge-where
+         (cond-> (honeysql/select :_type :_id :_data)
+           true (honeysql/from (:tablename (db/get-opts options)))
+           type (honeysql/merge-where [:= :_type (name type)]))
+         clauses))
+
+
+(defn select [db-spec type & clauses]
+  (->> (build-sqlmap db-spec type clauses)
+       (sql/format)
        (j/query db-spec)
        (map from-db-row)))
 
