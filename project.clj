@@ -7,7 +7,7 @@
                  [org.clojure/clojure "1.9.0"]
                  [org.clojure/java.jdbc "0.7.3"]
                  [org.postgresql/postgresql "42.1.4"]
-                 [honeysql "0.9.1"]]
+                 [honeysql "0.9.2"]]
 
   :plugins [[lein-codox "0.10.3"]]
   :codox {:metadata {:doc/format :markdown}}
