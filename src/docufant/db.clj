@@ -7,7 +7,6 @@
             [clojure.string :as str]))
 
 
-(def gin-index-types #{:jsonb_path_ops :jsonb_ops})
 (def default-opts {:tablename :docufant
                    :force false})
 
@@ -52,24 +51,31 @@
   [options]
   (j/execute! (get-spec options) (create-table-sql options)))
 
-(defn indexname [options {:keys [unique index-type path as]}]
+
+(defn indexname [options {:keys [unique index-type type path as]}]
   (let [{:keys [tablename]} (get-opts options)]
     (str "dfidx_"
          (name tablename) "_"
-         (str/join "_" (map name path))
+         (if path (str/join "_" (map name path)))
          (if index-type (str "__" (name index-type)))
+         (if type (str "__" (name type)))
          (if unique "__uniq")
          )))
 
 
+(defmulti index-target (fn [index] (:index-type index)))
+
+(defmethod index-target nil [{:keys [path]}] (jsonb-path :_data path))
+(defmethod index-target :gin [{:keys [gin-type]}] (sql/raw "gin(_data jsonb_ops)"))
+
+
 (defn build-index
   "Formats the SQL for the given index."
-  [options {:keys [unique name path type] :as index}]
-
-  {:create-index {:name (indexname options index)
-                  :on (jsonb-path :_data path)
+  [options {:keys [unique path type as] :as index}]
+  {:create-index {:name (sql/raw (indexname options index))
+                  :on (index-target index)
                   :unique unique}
-   :where (if type [:= :_type type] true)})
+   :where (if type [:= :_type (name type)] true)})
 
 
 (defn create-index!
@@ -78,8 +84,6 @@
   Accepts the following keys:
 
   * `:index-type` either `:gin` or `nil`
-  * `:gin-type` If the index is a GIN index, the gin type to create.
-    Defaults to `:jsonb_path_ops`
   * `:type` The document type to apply the index against, if `nil`, all types
     will be indexed.
   * `:path` The JSON path to the value to index.

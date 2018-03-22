@@ -1,5 +1,7 @@
 (ns docufant.db-test
   (:require [docufant.db :as db]
+            [docufant.postgres :as pg]
+            [honeysql.core :as sql]
             [clojure.test :as t :refer [deftest testing is]]))
 
 
@@ -14,11 +16,31 @@
          (db/indexname {} {:path [:a :b]
                            :index-type :gin})))
 
-  (is (= "dfidx_docufant_a_b__uniq"
-         (db/indexname {} {:path [:a :b]
+  (is (= "dfidx_docufant_a__mytype__uniq"
+         (db/indexname {} {:path [:a]
+                           :type :mytype
+                           :unique true})))
+
+  (is (= "dfidx_docufant_a_b_c__uniq"
+         (db/indexname {} {:path [:a :b :c]
                            :unique true})))
 
   (is (= "dfidx_foo_a_b"
          (db/indexname {:tablename "foo" :db-spec {}} {:path [:a :b] })))
 
+  )
+
+
+(deftest test-indexes
+  (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS dfidx_docufant_foo_bar_baz__uniq ON (_data #> ?) WHERE TRUE"
+          (pg/text-array [:foo :bar :baz])]
+         (-> (db/build-index *db-spec* {:unique true
+                                        :path [:foo :bar :baz]})
+             (sql/format))))
+
+  (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant___gin__animal ON gin(_data jsonb_ops) WHERE _type = ?"
+          "animal"]
+         (-> (db/build-index *db-spec* {:index-type :gin
+                                        :type :animal})
+             (sql/format))))
   )
