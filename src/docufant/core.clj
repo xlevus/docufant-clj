@@ -5,6 +5,7 @@
             [docufant.db :as db]
             [docufant.postgres :as pg]
             [docufant.operator :as operator]
+            [docufant.honeysql :refer [jsonb-path]]
             [honeysql.helpers :as honeysql]
             [honeysql.util :refer [defalias]]
             [honeysql.core :as sql]))
@@ -61,13 +62,14 @@
 
 
 (defn build-sqlmap [options type clauses]
-  (let [[clauses modifiers] (strip-kwargs clauses)]
+  (let [[clauses {:keys [limit offset order-by] :as modifiers}] (strip-kwargs clauses)]
     (apply honeysql/merge-where
            (cond-> (honeysql/select :_type :_id :_data)
              true (honeysql/from (:tablename (db/get-opts options)))
              type (honeysql/merge-where [:= :_type (name type)])
-             (:limit modifiers) (honeysql/limit (:limit modifiers))
-             (:offset modifiers) (honeysql/offset (:offset modifiers)))
+             limit (honeysql/limit limit)
+             offset (honeysql/offset offset)
+             order-by (honeysql/order-by [(jsonb-path :_data (first order-by)) (last order-by)]))
            clauses)))
 
 

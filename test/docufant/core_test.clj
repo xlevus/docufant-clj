@@ -82,6 +82,9 @@
       (is (= [i3 i4] (doc/select *db-spec* :ordered (oper/> [:b] 1)
                                  :limit 2
                                  :offset 2)))
+
+      (is (= [i4 i3 i2 i1] (doc/select *db-spec* :ordered (oper/> [:b] 1)
+                                       :order-by [[:b] :desc])))
       ))
 
   (testing "get"
