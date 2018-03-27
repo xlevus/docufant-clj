@@ -2,6 +2,7 @@
   (:require [docufant.core :as doc]
             [docufant.db :as db]
             [docufant.postgres :as pg]
+            [docufant.operator :as oper]
             [clojure.test :as t :refer [deftest testing is]]
             [clojure.java.jdbc :as j]))
 
@@ -60,10 +61,21 @@
       ))
 
   (testing "inequality"
-    (let [i1 (doc/create! *db-spec* :ordered {:a 1})
-          i2 (doc/create! *db-spec* :ordered {:a 2})
-          i3 (doc/create! *db-spec* :ordered {:a 3 :c {:d 10}})
-          i4 (doc/create! *db-spec* :ordered {:b 1})]
+    (let [i1 (doc/create! *db-spec* :ordered {:a 1 :b 3})
+          i2 (doc/create! *db-spec* :ordered {:a 2 :b 4})
+          i3 (doc/create! *db-spec* :ordered {:a 3 :b 5 :c {:d 10}})
+          i4 (doc/create! *db-spec* :ordered {:b 6 :c {:d 5}})]
+
+      (is (= [i1] (doc/select *db-spec* :ordered (oper/< [:a] 2))))
+      (is (= [i3] (doc/select *db-spec* :ordered (oper/> [:a] 2))))
+      (is (= [i1 i2] (doc/select *db-spec* :ordered (oper/<= [:a] 2))))
+      (is (= [i2 i3] (doc/select *db-spec* :ordered (oper/>= [:a] 2))))
+      (is (= [i2 i3] (doc/select *db-spec* :ordered (oper/<> [:a] 1))))
+
+      (is (= [i1 i2 i3 i4] (doc/select *db-spec* :ordered (oper/> [:b] 1))))
+      (is (= [i3] (doc/select *db-spec* :ordered
+                              (oper/> [:b] 1)
+                              (oper/> [:c :d] 6))))
 
       ))
 
