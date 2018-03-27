@@ -72,11 +72,16 @@
       (is (= [i2 i3] (doc/select *db-spec* :ordered (oper/>= [:a] 2))))
       (is (= [i2 i3] (doc/select *db-spec* :ordered (oper/<> [:a] 1))))
 
-      (is (= [i1 i2 i3 i4] (doc/select *db-spec* :ordered (oper/> [:b] 1))))
       (is (= [i3] (doc/select *db-spec* :ordered
                               (oper/> [:b] 1)
                               (oper/> [:c :d] 6))))
 
+      (is (= [i1 i2] (doc/select *db-spec* :ordered (oper/> [:b] 1)
+                                       :limit 2)))
+
+      (is (= [i3 i4] (doc/select *db-spec* :ordered (oper/> [:b] 1)
+                                 :limit 2
+                                 :offset 2)))
       ))
 
   (testing "get"
