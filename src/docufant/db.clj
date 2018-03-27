@@ -1,10 +1,12 @@
 (ns docufant.db
   (:require [clojure.java.jdbc :as j]
             [clojure.string :as string]
-            [docufant.postgres :as pg]))
+            [honeysql.core :as sql]
+            [docufant.postgres :as pg]
+            [docufant.honeysql :refer [jsonb-path]]
+            [clojure.string :as str]))
 
 
-(def gin-index-types #{:jsonb_path_ops :jsonb_ops})
 (def default-opts {:tablename :docufant
                    :force false})
 
@@ -50,39 +52,31 @@
   (j/execute! (get-spec options) (create-table-sql options)))
 
 
-(defn indexname
-  [path]
-  (if (coll? path)
-    (string/join "_" (map name path))
-    (name path)))
+(defn indexname [options {:keys [unique index-type type path as]}]
+  (let [{:keys [tablename]} (get-opts options)]
+    (str "dfidx_"
+         (name tablename) "_"
+         (if path (str/join "_" (map name path)))
+         (if index-type (str "__" (name index-type)))
+         (if type (str "__" (name type)))
+         (if unique "__uniq")
+         )))
 
 
-(defn format-index
+(defmulti index-target (fn [index] (:index-type index)))
+
+(defmethod index-target nil [{:keys [path]}] {:field (jsonb-path :_data path)})
+(defmethod index-target :gin [{:keys [gin-type]}] {:using (sql/raw "gin(_data jsonb_ops)")})
+
+
+(defn build-index
   "Formats the SQL for the given index."
-  [options index-name clause {:keys [unique type]}]
-  (let [{:keys [force tablename] :as opts} (get-opts options)]
-    (pg/reduce-q ["CREATE " (if unique "UNIQUE ") "INDEX "
-                  (if force nil "IF NOT EXISTS ")
-                  "idx_" (name tablename) (if type (str "__" (name type))) "__" index-name
-                  " ON " (name tablename) " "
-                  clause
-                  (if type [" WHERE _type = ?" type])])))
-
-
-(defmulti build-index (fn [options {:keys [index-type]}] index-type))
-
-(defmethod build-index :gin [options {:keys [gin-type type]}]
-  (format-index options
-                "gin"
-                (str "USING GIN(_data " (name gin-type) ")")
-                {:type type}))
-
-
-(defmethod build-index nil [options {:keys [path unique type as]}]
-  (format-index options
-                (indexname path)
-                (pg/reduce-q ["((" (pg/json-subq :_data path {:as as}) "))"])
-                {:type type}))
+  [options {:keys [unique path type as] :as index}]
+  {:create-index (merge {:name (sql/raw (indexname options index))
+                         :on (get-opts options :tablename)
+                         :unique unique}
+                        (index-target index))
+   :where (if type [:= :_type (name type)] true)})
 
 
 (defn create-index!
@@ -91,8 +85,6 @@
   Accepts the following keys:
 
   * `:index-type` either `:gin` or `nil`
-  * `:gin-type` If the index is a GIN index, the gin type to create.
-    Defaults to `:jsonb_path_ops`
   * `:type` The document type to apply the index against, if `nil`, all types
     will be indexed.
   * `:path` The JSON path to the value to index.
@@ -102,4 +94,5 @@
     `docufant.postgres/format-cast`"
   [options index]
   (j/execute! (get-spec options)
-              (build-index options index)))
+              (-> (build-index options index)
+                  (sql/format))))

@@ -1,8 +1,21 @@
 (ns docufant.core
+  (:refer-clojure :exclude [get < > = <= >=])
   (:require [clojure.java.jdbc :as j]
             [cheshire.core :refer [parse-string]]
             [docufant.db :as db]
-            [docufant.postgres :as pg]))
+            [docufant.postgres :as pg]
+            [docufant.operator :as operator]
+            [docufant.honeysql :refer [jsonb-path]]
+            [honeysql.helpers :as honeysql]
+            [honeysql.util :refer [defalias]]
+            [honeysql.core :as sql]))
+
+(defalias = operator/=)
+(defalias > operator/>)
+(defalias < operator/<)
+(defalias <= operator/<=)
+(defalias >= operator/>=)
+(defalias <> operator/<>)
 
 
 (defn from-db-row [row]
@@ -17,38 +30,6 @@
     (assoc data :id [type id])))
 
 
-(defmulti clause-handler (fn [op & args] op))
-
-(defmethod clause-handler :contains [_ v]
-  [(str "_data @> ?") (pg/jsonb v)])
-
-(defmethod clause-handler :has-keys
-  ([op v] (clause-handler op nil v))
-  ([op p v] (pg/reduce-q [(pg/json-subq :_data p)
-                          [(str " ??& ?") (pg/text-array v)]])))
-
-(defmethod clause-handler :default
-  ([op v] (clause-handler op nil v))
-  ([op p v] (pg/reduce-q [(pg/json-subq :_data p)
-                          [(str " " (name op) " ?") (pg/jsonb v)]])))
-
-
-(defn format-sql [options type clauses]
-  (loop [rest clauses
-         sql (str "SELECT * FROM "
-                  (name (db/get-opts options :tablename))
-                  (if (nil? type)
-                    " WHERE true"
-                    " WHERE _type = ?"))
-         params (if (nil? type) [] [(name type)])]
-    (if (empty? rest)
-      (cons sql params)
-      (let [[q & p] (apply clause-handler (first rest))]
-        (recur (next rest)
-               (str sql " AND " q)
-               (concat params p)))
-      )))
-
 (defn create!
   "Creates a document of type `type` with body `data`.
   Returns the created object, with the `:id` field set to `[type id]`"
@@ -60,15 +41,41 @@
 
 
 (defn update!
-  "Update document"
+  "Update document with `[type id]` to value `data`."
   [options [type id] data]
   (j/update! (db/get-spec options) (db/get-opts options :tablename)
              {:_data (pg/jsonb data)}
              ["_type = ? AND _id = ?" (name type) id]))
 
 
-(defn select [db-spec type clauses]
-  (->> (format-sql db-spec type clauses)
+(defn- strip-kwargs
+  "Strips any 'keyword arguments' from the tail of a list"
+  [clauses]
+  (loop [r clauses
+         claus []
+         opts {}]
+    (if r
+      (if (or (not (empty? opts)) (keyword? (first r)))
+        (recur (nthnext r 2) claus (assoc opts (first r) (second r)))
+        (recur (next r) (conj claus (first r)) opts))
+      [claus opts])))
+
+
+(defn build-sqlmap [options type clauses]
+  (let [[clauses {:keys [limit offset order-by] :as modifiers}] (strip-kwargs clauses)]
+    (apply honeysql/merge-where
+           (cond-> (honeysql/select :_type :_id :_data)
+             true (honeysql/from (:tablename (db/get-opts options)))
+             type (honeysql/merge-where [:= :_type (name type)])
+             limit (honeysql/limit limit)
+             offset (honeysql/offset offset)
+             order-by (honeysql/order-by [(jsonb-path :_data (first order-by)) (last order-by)]))
+           clauses)))
+
+
+(defn select [db-spec type & clauses]
+  (->> (build-sqlmap db-spec type clauses)
+       (sql/format)
        (j/query db-spec)
        (map from-db-row)))
 
