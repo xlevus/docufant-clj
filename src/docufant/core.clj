@@ -61,16 +61,34 @@
       [claus opts])))
 
 
+
+(defmulti select-modifier (fn [query [modifier value]] modifier))
+
+(defmethod select-modifier :limit [query [_ value]]
+  (honeysql/limit query value))
+
+(defmethod select-modifier :offset [query [_ value]]
+  (honeysql/offset query value))
+
+(defmethod select-modifier :order-by [query [_ [path direction]]]
+  (honeysql/order-by query [(jsonb-path :_data path) direction]))
+
+
+(defn base-sqlmap [options type]
+  (cond-> (honeysql/select :_type :_id :_data)
+    true (honeysql/from (:tablename (db/get-opts options)))
+    type (honeysql/merge-where [:= :_type (name type)])))
+
+
+(defn apply-clauses [query clauses] (apply honeysql/merge-where query clauses))
+(defn apply-modifiers [query modifiers] (reduce select-modifier query modifiers))
+
+
 (defn build-sqlmap [options type clauses]
-  (let [[clauses {:keys [limit offset order-by] :as modifiers}] (strip-kwargs clauses)]
-    (apply honeysql/merge-where
-           (cond-> (honeysql/select :_type :_id :_data)
-             true (honeysql/from (:tablename (db/get-opts options)))
-             type (honeysql/merge-where [:= :_type (name type)])
-             limit (honeysql/limit limit)
-             offset (honeysql/offset offset)
-             order-by (honeysql/order-by [(jsonb-path :_data (first order-by)) (last order-by)]))
-           clauses)))
+  (let [[clauses modifiers] (strip-kwargs clauses)]
+    (-> (base-sqlmap options type)
+        (apply-clauses clauses)
+        (apply-modifiers modifiers))))
 
 
 (defn select [db-spec type & clauses]
