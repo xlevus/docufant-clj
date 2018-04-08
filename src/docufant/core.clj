@@ -6,6 +6,7 @@
             [docufant.postgres :as pg]
             [docufant.operator :as operator]
             [docufant.honeysql :refer [jsonb-path]]
+            [docufant.util :refer [strip-kwargs]]
             [honeysql.helpers :as honeysql]
             [honeysql.util :refer [defalias]]
             [honeysql.core :as sql]))
@@ -46,19 +47,6 @@
   (j/update! (db/get-spec options) (db/get-opts options :tablename)
              {:_data (pg/jsonb data)}
              ["_type = ? AND _id = ?" (name type) id]))
-
-
-(defn- strip-kwargs
-  "Strips any 'keyword arguments' from the tail of a list"
-  [clauses]
-  (loop [r clauses
-         claus []
-         opts {}]
-    (if r
-      (if (or (not (empty? opts)) (keyword? (first r)))
-        (recur (nthnext r 2) claus (assoc opts (first r) (second r)))
-        (recur (next r) (conj claus (first r)) opts))
-      [claus opts])))
 
 
 
