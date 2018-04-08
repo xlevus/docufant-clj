@@ -46,10 +46,25 @@
           "_data JSONB);")]))
 
 
+(defn create-link-sql
+  [options]
+  (let [{:keys [force tablename]} (get-opts options)
+        tablename (name tablename)]
+    [(str "CREATE TABLE"
+          (if force nil " IF NOT EXISTS ")
+          tablename "_links ("
+          "_left INTEGER REFERENCES " tablename "(_id), "
+          "_right INTEGER REFERENCES " tablename "(_id), "
+          "_type VARCHAR(100));"
+          )]))
+
+
 (defn create-tables!
   "Create the docufant tables."
   [options]
-  (j/execute! (get-spec options) (create-table-sql options)))
+  (j/execute! (get-spec options) (create-table-sql options))
+  (j/execute! (get-spec options) (create-link-sql options))
+  )
 
 
 (defn indexname [options {:keys [unique index-type type path as]}]
