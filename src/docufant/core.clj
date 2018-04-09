@@ -50,15 +50,15 @@
 
 
 
-(defmulti select-modifier (fn [query [modifier value]] modifier))
+(defmulti select-modifier (fn [modifier query value] modifier))
 
-(defmethod select-modifier :limit [query [_ value]]
+(defmethod select-modifier :limit [_ query value]
   (honeysql/limit query value))
 
-(defmethod select-modifier :offset [query [_ value]]
+(defmethod select-modifier :offset [_ query value]
   (honeysql/offset query value))
 
-(defmethod select-modifier :order-by [query [_ [path direction]]]
+(defmethod select-modifier :order-by [_ query [path direction]]
   (honeysql/order-by query [(jsonb-path :_data path) direction]))
 
 
@@ -69,7 +69,11 @@
 
 
 (defn apply-clauses [query clauses] (apply honeysql/merge-where query clauses))
-(defn apply-modifiers [query modifiers] (reduce select-modifier query modifiers))
+(defn apply-modifiers [query modifiers]
+  (reduce
+   (fn [q [m v]] (select-modifier m q v))
+   query
+   modifiers))
 
 
 (defn build-sqlmap [options type clauses]
