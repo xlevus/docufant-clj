@@ -6,6 +6,8 @@
             [docufant.postgres :as pg]
             [docufant.operator :as operator]
             [docufant.honeysql :refer [jsonb-path]]
+            [docufant.util :refer [strip-kwargs]]
+            [docufant.options :refer [with-options get-options get-connection]]
             [honeysql.helpers :as honeysql]
             [honeysql.util :refer [defalias]]
             [honeysql.core :as sql]))
@@ -30,59 +32,97 @@
     (assoc data :id [type id])))
 
 
+(defn find-id [inst]
+  (if (contains? inst :id) (:id inst) inst))
+
+
 (defn create!
   "Creates a document of type `type` with body `data`.
   Returns the created object, with the `:id` field set to `[type id]`"
   [options type data]
-  (->> {:_type (name type) :_data (pg/jsonb data)}
-       (j/insert! (db/get-spec options) (db/get-opts options :tablename))
-       (first)
-       (from-db-row)))
+  (with-options options
+    (->> {:_type (name type) :_data (pg/jsonb data)}
+         (j/insert! (get-connection)
+                    (get-options :doc-table))
+         (first)
+         (from-db-row))))
 
 
 (defn update!
   "Update document with `[type id]` to value `data`."
   [options [type id] data]
-  (j/update! (db/get-spec options) (db/get-opts options :tablename)
-             {:_data (pg/jsonb data)}
-             ["_type = ? AND _id = ?" (name type) id]))
+  (with-options options
+    (j/update! (get-connection)
+               (get-options :doc-table)
+               {:_data (pg/jsonb data)}
+               ["_type = ? AND _id = ?" (name type) id])))
 
 
-(defn- strip-kwargs
-  "Strips any 'keyword arguments' from the tail of a list"
-  [clauses]
-  (loop [r clauses
-         claus []
-         opts {}]
-    (if r
-      (if (or (not (empty? opts)) (keyword? (first r)))
-        (recur (nthnext r 2) claus (assoc opts (first r) (second r)))
-        (recur (next r) (conj claus (first r)) opts))
-      [claus opts])))
+(defn link!
+  [options link-type left right]
+  (with-options options
+    (->> {:_left (last (find-id left)) :_right (last (find-id right)) :_linktype (name link-type)}
+         (j/insert! (get-connection)
+                    (get-options :link-table)))))
 
 
-(defn build-sqlmap [options type clauses]
-  (let [[clauses {:keys [limit offset order-by] :as modifiers}] (strip-kwargs clauses)]
-    (apply honeysql/merge-where
-           (cond-> (honeysql/select :_type :_id :_data)
-             true (honeysql/from (:tablename (db/get-opts options)))
-             type (honeysql/merge-where [:= :_type (name type)])
-             limit (honeysql/limit limit)
-             offset (honeysql/offset offset)
-             order-by (honeysql/order-by [(jsonb-path :_data (first order-by)) (last order-by)]))
-           clauses)))
+(defmulti select-modifier (fn [modifier query value] modifier))
+
+(defmethod select-modifier :limit [_ query value]
+  (honeysql/limit query value))
+
+(defmethod select-modifier :offset [_ query value]
+  (honeysql/offset query value))
+
+(defmethod select-modifier :order-by [_ query [path direction]]
+  (honeysql/order-by query [(jsonb-path :_data path) direction]))
+
+(defmethod select-modifier :linked-to [_ query [link-type link-target]]
+  (-> query
+      (honeysql/join [(get-options :link-table) :l] [:= :_id :l._right])
+      (honeysql/merge-where [:= :l._left (last (find-id link-target))]
+                            [:= :l._linktype (name link-type)])
+      ))
 
 
-(defn select [db-spec type & clauses]
-  (->> (build-sqlmap db-spec type clauses)
-       (sql/format)
-       (j/query db-spec)
-       (map from-db-row)))
+(defn base-sqlmap [type]
+  (cond-> (honeysql/select :_type :_id :_data)
+    true (honeysql/from (get-options :doc-table))
+    type (honeysql/merge-where [:= :_type (name type)])))
+
+
+(defn apply-clauses [query clauses]
+  (if (empty? clauses)
+    query
+    (apply honeysql/merge-where query clauses)))
+
+
+(defn apply-modifiers [query modifiers]
+  (reduce
+   (fn [q [m v]] (select-modifier m q v))
+   query
+   modifiers))
+
+
+(defn build-sqlmap [type clauses]
+  (let [[clauses modifiers] (strip-kwargs clauses)]
+    (-> (base-sqlmap type)
+        (apply-clauses clauses)
+        (apply-modifiers modifiers))))
+
+
+(defn select [options type & clauses]
+  (with-options options
+    (->> (build-sqlmap type clauses)
+        (sql/format)
+        (j/query (get-connection))
+        (map from-db-row))))
 
 
 (defn get [options [type id]]
-  (some-> (j/query (db/get-spec options)
-                   [(str "SELECT * FROM " (name (db/get-opts options :tablename))
-                         " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
-          (first)
-          (from-db-row)))
+  (with-options options
+    (some-> (j/query (get-connection)
+                    [(str "SELECT * FROM " (name (get-options :doc-table))
+                          " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
+           (first)
+           (from-db-row))))

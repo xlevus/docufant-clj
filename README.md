@@ -2,71 +2,108 @@
 
 [![master](https://img.shields.io/travis/xlevus/docufant-clj/master.svg?style=for-the-badge)](https://travis-ci.org/xlevus/docufant-clj)
 
-A HoneySQL wrapper facilitating using Postgresql as a document store.
+A postgres backed document store library. Supports traditional SQL features such as transactions, indexes, unique values, and strict relationships between documents, while foregoing strict schemas.
+
+Under the hood, docufant is powered by HoneySQL and java.jdbc.
 
 
 [![Clojars Project](https://img.shields.io/clojars/v/docufant.svg?style=for-the-badge)](https://clojars.org/docufant)
 
 
-## Usage
+## Basic Usage
 
 
 ```clojure
 
 (require '[docufant.core :as doc])
-(require '[docufant.db :as db])
 
 
 (def db-spec {:dbtype "postgresql" :dbname "my_doc_store" :user "user" :password "pass"})
 (doc/init! db-spec)
 
-(doc/create! db-spec :staff {:name "Agnes" :salary {:annual 50000}})
+(def agnes (doc/create! db-spec :staff {:name "Agnes" :salary {:annual 50000}}))
 ; {:name "Agnes", :id [:staff 1], ...}
 
-
-(doc/create! :staff {:name "Bert" :salary {:annual 10000}})
+(def bert (doc/create! db-spec :staff {:name "Bert" :salary {:annual 10000}}))
 ; {:name "Bert", :id [:staff 2], ...}
 
-(doc/create! :customer {:name "Edward"})
+(def edward (doc/create! db-spec :customer {:name "Edward"}))
 ; {:name "Edward", :id [:customer 3]}
 
 
 ;; Select everything
-(doc/select nil [])
-; [{:id [:staff 1] :name "Agnes" ...}
-   {:id [:staff 2] :name "Bert" ...}
-   {:id [:customer 3] :name "Edward" ...}]
+(doc/select db-spec nil [])
+; [{:id [:staff 1], :name "Agnes" ...}
+;  {:id [:staff 2], :name "Bert" ...}
+;  {:id [:customer 3], :name "Edward" ...}]
    
    
 ;; Select specific types
-(doc/select :customer [])
-; [{:id [:customer 3] :name "Edward" ...}]
+(doc/select db-spec :customer [])
+; [{:id [:customer 3], :name "Edward" ...}]
 
 
 ;; Select by JSON operations
-(doc/select :staff (doc/= [:salary :annual] 10000))
+(doc/select db-spec :staff (doc/= [:salary :annual] 10000))
 ; [{:name "Bert" ...}]
 
-(doc/select :staff (doc/> [:salary :annual] 10000))
+(doc/select db-spec :staff (doc/> [:salary :annual] 10000))
 ; [{:name "Agnes" ...}]
 
 ;; Get a specific row
-(doc/get [:customer 3])
+(doc/get db-spec [:customer 3])
 ; {:name "Edward" ...}
 
 ;; Limit/offset/order results
-(doc/select :staff 
+(doc/select db-spec :staff 
             (doc/> [:salary :annual] 1) 
             :limit 1
             :offset 1
             :order-by [[:salary :annual] :desc])
+            
+            
+```
+
+
+## Indexes
+Fields within documents can be indexed, allowing faster retrival of rows and unique values in given document keys.
+
+Additionally, a GIN index can be created to speed up queries on all fields.
+
+```clojure
+##
+(require '[docufant.db :as dfdb])
+
+
+;; Create a GIN index across all document types.
+(dfdb/create-index! db-spec {:index-type :gin
+                             :type nil})
+
+
+;; Ensure all Staff have unique email addresses.
+(dfdb/create-index! db-spec {:type :staff
+                             :path [:contact :email]
+                             :unique true})
+
+```
+
+## Document Links
+
+Documents can be linked together with named one-directional relationships, and then queried by
+these relationships.
+
+```clojure
+(doc/link! db-spec :boss agnes bert)
+; nil
+
+;; Select linked instances
+(doc/select db-spec :staff :linked-to [:boss agnes])
+; [{:name "Bert" ...}]
 ```
 
 
 ## TODO
 
 * Documentation
-* User-specified indexes on jsonb queries. 
-* linking between documents.
 * `swap!`
 * Callbacks by type read/write
