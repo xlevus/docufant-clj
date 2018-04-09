@@ -6,7 +6,8 @@
             [docufant.postgres :as pg]
             [docufant.operator :as operator]
             [docufant.honeysql :refer [jsonb-path]]
-            [docufant.util :refer [strip-kwargs spy]]
+            [docufant.util :refer [strip-kwargs]]
+            [docufant.options :refer [with-options get-options get-connection]]
             [honeysql.helpers :as honeysql]
             [honeysql.util :refer [defalias]]
             [honeysql.core :as sql]))
@@ -39,24 +40,30 @@
   "Creates a document of type `type` with body `data`.
   Returns the created object, with the `:id` field set to `[type id]`"
   [options type data]
-  (->> {:_type (name type) :_data (pg/jsonb data)}
-       (j/insert! (db/get-spec options) (db/get-opts options :tablename))
-       (first)
-       (from-db-row)))
+  (with-options options
+    (->> {:_type (name type) :_data (pg/jsonb data)}
+         (j/insert! (get-connection)
+                    (get-options :doc-table))
+         (first)
+         (from-db-row))))
 
 
 (defn update!
   "Update document with `[type id]` to value `data`."
   [options [type id] data]
-  (j/update! (db/get-spec options) (db/get-opts options :tablename)
-             {:_data (pg/jsonb data)}
-             ["_type = ? AND _id = ?" (name type) id]))
+  (with-options options
+    (j/update! (get-connection)
+               (get-options :doc-table)
+               {:_data (pg/jsonb data)}
+               ["_type = ? AND _id = ?" (name type) id])))
 
 
 (defn link!
   [options link-type left right]
-  (->> {:_left (last (find-id left)) :_right (last (find-id right)) :_linktype (name link-type)}
-       (j/insert! (db/get-spec options) (db/get-opts options :linktable))))
+  (with-options options
+    (->> {:_left (last (find-id left)) :_right (last (find-id right)) :_linktype (name link-type)}
+         (j/insert! (get-connection)
+                    (get-options :link-table)))))
 
 
 (defmulti select-modifier (fn [modifier query value] modifier))
@@ -70,17 +77,17 @@
 (defmethod select-modifier :order-by [_ query [path direction]]
   (honeysql/order-by query [(jsonb-path :_data path) direction]))
 
-(defmethod select-modifier :linked-to [_ query [link-type aaa]]
+(defmethod select-modifier :linked-to [_ query [link-type link-target]]
   (-> query
-      (honeysql/join [:docufant_link :l] [:= :docufant._id :l._right])
-      (honeysql/merge-where [:= :l._left (last (find-id aaa))]
+      (honeysql/join [(get-options :link-table) :l] [:= :_id :l._right])
+      (honeysql/merge-where [:= :l._left (last (find-id link-target))]
                             [:= :l._linktype (name link-type)])
       ))
 
 
-(defn base-sqlmap [options type]
+(defn base-sqlmap [type]
   (cond-> (honeysql/select :_type :_id :_data)
-    true (honeysql/from (:tablename (db/get-opts options)))
+    true (honeysql/from (get-options :doc-table))
     type (honeysql/merge-where [:= :_type (name type)])))
 
 
@@ -89,6 +96,7 @@
     query
     (apply honeysql/merge-where query clauses)))
 
+
 (defn apply-modifiers [query modifiers]
   (reduce
    (fn [q [m v]] (select-modifier m q v))
@@ -96,23 +104,25 @@
    modifiers))
 
 
-(defn build-sqlmap [options type clauses]
+(defn build-sqlmap [type clauses]
   (let [[clauses modifiers] (strip-kwargs clauses)]
-    (-> (base-sqlmap options type)
+    (-> (base-sqlmap type)
         (apply-clauses clauses)
         (apply-modifiers modifiers))))
 
 
-(defn select [db-spec type & clauses]
-  (->> (build-sqlmap db-spec type clauses)
-       (sql/format)
-       (j/query db-spec)
-       (map from-db-row)))
+(defn select [options type & clauses]
+  (with-options options
+    (->> (build-sqlmap type clauses)
+        (sql/format)
+        (j/query (get-connection))
+        (map from-db-row))))
 
 
 (defn get [options [type id]]
-  (some-> (j/query (db/get-spec options)
-                   [(str "SELECT * FROM " (name (db/get-opts options :tablename))
-                         " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
-          (first)
-          (from-db-row)))
+  (with-options options
+    (some-> (j/query (get-connection)
+                    [(str "SELECT * FROM " (name (get-options :doc-table))
+                          " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
+           (first)
+           (from-db-row))))

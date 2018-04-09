@@ -4,78 +4,42 @@
             [honeysql.core :as sql]
             [docufant.postgres :as pg]
             [docufant.honeysql :refer [jsonb-path]]
+            [docufant.options :refer [with-options get-options get-connection]]
             [clojure.string :as str]))
-
-
-(def default-opts {:tablename :docufant
-                   :linktable :docufant_link
-                   :force false})
-
-
-(defn get-opts
-  "Gets the docufant-options from an opts/db-spec map, and fills in any defaults.
-
-  If `:db-spec` is present, the map will be returned sans db-spec, otherwise the
-  default options will be returned."
-  ([{:keys [db-spec] :as options}]
-   (merge default-opts
-          (if db-spec
-            (dissoc options :db-spec)
-            {})))
-  ([options key] (key (get-opts options))))
-
-(defn get-spec
-  "Returns the db-spec from a options/db-spec map.
-
-  If a key `:db-spec` is present, that will be returned, otherwise the map will be
-  returned."
-  [{:keys [db-spec] :as options}]
-  (if db-spec db-spec options))
 
 
 (defn create-table-sql
   "Gets the SQL for the docufant tables.
   If the `:force option` is `false` (the default), the table will only be created if
   it does not already exist."
-  [options]
-  (let [{:keys [force tablename]} (get-opts options)]
-    [(str "CREATE TABLE"
-          (if force nil " IF NOT EXISTS ")
-          (name tablename)
-          " (_id SERIAL PRIMARY KEY,"
-          "_type VARCHAR(100),"
-          "_data JSONB);")]))
+  []
+  [(str "CREATE TABLE "
+        (if (get-options :force-creation) nil "IF NOT EXISTS ")
+        (name (get-options :doc-table))
+        " (_id SERIAL PRIMARY KEY,"
+        "_type VARCHAR(100),"
+        "_data JSONB);")])
 
 
 (defn create-link-sql
-  [options]
-  (let [{:keys [force linktable tablename]} (get-opts options)]
-    [(str "CREATE TABLE"
-          (if force nil " IF NOT EXISTS ")
-          (name linktable)
-          "(_left INTEGER REFERENCES " (name tablename) "(_id), "
-          "_right INTEGER REFERENCES " (name tablename) "(_id), "
-          "_linktype VARCHAR(100));"
-          )]))
+  []
+  [(str "CREATE TABLE "
+        (if (get-options :force-creation) nil "IF NOT EXISTS ")
+        (name (get-options :link-table))
+        "(_left INTEGER REFERENCES " (name (get-options :doc-table)) "(_id), "
+        "_right INTEGER REFERENCES " (name (get-options :doc-table)) "(_id), "
+        "_linktype VARCHAR(100));"
+        )])
 
 
-(defn create-tables!
-  "Create the docufant tables."
-  [options]
-  (j/execute! (get-spec options) (create-table-sql options))
-  (j/execute! (get-spec options) (create-link-sql options))
-  )
-
-
-(defn indexname [options {:keys [unique index-type type path as]}]
-  (let [{:keys [tablename]} (get-opts options)]
-    (str "dfidx_"
-         (name tablename) "_"
-         (if path (str/join "_" (map name path)))
-         (if index-type (str "__" (name index-type)))
-         (if type (str "__" (name type)))
-         (if unique "__uniq")
-         )))
+(defn indexname [{:keys [unique index-type type path as]}]
+  (str "dfidx_"
+       (name (get-options :doc-table)) "_"
+       (if path (str/join "_" (map name path)))
+       (if index-type (str "__" (name index-type)))
+       (if type (str "__" (name type)))
+       (if unique "__uniq")
+       ))
 
 
 (defmulti index-target (fn [index] (:index-type index)))
@@ -86,12 +50,20 @@
 
 (defn build-index
   "Formats the SQL for the given index."
-  [options {:keys [unique path type as] :as index}]
-  {:create-index (merge {:name (sql/raw (indexname options index))
-                         :on (get-opts options :tablename)
+  [{:keys [unique path type as] :as index}]
+  {:create-index (merge {:name (sql/raw (indexname index))
+                         :on (get-options :doc-table)
                          :unique unique}
                         (index-target index))
    :where (if type [:= :_type (name type)] true)})
+
+
+(defn create-tables!
+  "Create the docufant tables."
+  [options]
+  (with-options options
+    (j/execute! (get-connection) (create-table-sql))
+    (j/execute! (get-connection) (create-link-sql))))
 
 
 (defn create-index!
@@ -108,6 +80,7 @@
     `Long`. More types can be supported by adding methods to
     `docufant.postgres/format-cast`"
   [options index]
-  (j/execute! (get-spec options)
-              (-> (build-index options index)
-                  (sql/format))))
+  (with-options options
+    (j/execute! (get-connection)
+               (-> (build-index index)
+                   (sql/format)))))
