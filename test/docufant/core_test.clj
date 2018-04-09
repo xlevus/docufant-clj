@@ -94,3 +94,15 @@
       (is (nil? (doc/get *db-spec* [:foo 1])))
 
       )))
+
+
+(deftest test-links
+  (testing "abc"
+    (let [i1 (doc/create! *db-spec* :tparent {:a 1})
+          i2 (doc/create! *db-spec* :tchild {:a 2})]
+      (doc/link! *db-spec* :parent i1 i2)
+      (doc/link! *db-spec* :child i2 i1)
+
+      (is (= [i2] (doc/select *db-spec* nil :linked-to [:parent i1])))
+      (is (= [i1] (doc/select *db-spec* nil :linked-to [:child i2])))
+      )))

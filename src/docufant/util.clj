@@ -14,3 +14,7 @@
       [claus opts])))
 
 
+
+(defn spy
+  ([x] (println x) x)
+  ([x y] (println x y) y))

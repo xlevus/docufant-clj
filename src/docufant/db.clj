@@ -8,6 +8,7 @@
 
 
 (def default-opts {:tablename :docufant
+                   :linktable :docufant_link
                    :force false})
 
 
@@ -48,14 +49,13 @@
 
 (defn create-link-sql
   [options]
-  (let [{:keys [force tablename]} (get-opts options)
-        tablename (name tablename)]
+  (let [{:keys [force linktable tablename]} (get-opts options)]
     [(str "CREATE TABLE"
           (if force nil " IF NOT EXISTS ")
-          tablename "_links ("
-          "_left INTEGER REFERENCES " tablename "(_id), "
-          "_right INTEGER REFERENCES " tablename "(_id), "
-          "_type VARCHAR(100));"
+          (name linktable)
+          "(_left INTEGER REFERENCES " (name tablename) "(_id), "
+          "_right INTEGER REFERENCES " (name tablename) "(_id), "
+          "_linktype VARCHAR(100));"
           )]))
 
 

@@ -6,7 +6,7 @@
             [docufant.postgres :as pg]
             [docufant.operator :as operator]
             [docufant.honeysql :refer [jsonb-path]]
-            [docufant.util :refer [strip-kwargs]]
+            [docufant.util :refer [strip-kwargs spy]]
             [honeysql.helpers :as honeysql]
             [honeysql.util :refer [defalias]]
             [honeysql.core :as sql]))
@@ -31,6 +31,10 @@
     (assoc data :id [type id])))
 
 
+(defn find-id [inst]
+  (if (contains? inst :id) (:id inst) inst))
+
+
 (defn create!
   "Creates a document of type `type` with body `data`.
   Returns the created object, with the `:id` field set to `[type id]`"
@@ -49,6 +53,11 @@
              ["_type = ? AND _id = ?" (name type) id]))
 
 
+(defn link!
+  [options link-type left right]
+  (->> {:_left (last (find-id left)) :_right (last (find-id right)) :_linktype (name link-type)}
+       (j/insert! (db/get-spec options) (db/get-opts options :linktable))))
+
 
 (defmulti select-modifier (fn [modifier query value] modifier))
 
@@ -61,6 +70,13 @@
 (defmethod select-modifier :order-by [_ query [path direction]]
   (honeysql/order-by query [(jsonb-path :_data path) direction]))
 
+(defmethod select-modifier :linked-to [_ query [link-type aaa]]
+  (-> query
+      (honeysql/join [:docufant_link :l] [:= :docufant._id :l._right])
+      (honeysql/merge-where [:= :l._left (last (find-id aaa))]
+                            [:= :l._linktype (name link-type)])
+      ))
+
 
 (defn base-sqlmap [options type]
   (cond-> (honeysql/select :_type :_id :_data)
@@ -68,7 +84,11 @@
     type (honeysql/merge-where [:= :_type (name type)])))
 
 
-(defn apply-clauses [query clauses] (apply honeysql/merge-where query clauses))
+(defn apply-clauses [query clauses]
+  (if (empty? clauses)
+    query
+    (apply honeysql/merge-where query clauses)))
+
 (defn apply-modifiers [query modifiers]
   (reduce
    (fn [q [m v]] (select-modifier m q v))
