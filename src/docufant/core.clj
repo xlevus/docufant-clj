@@ -121,8 +121,8 @@
 
 (defn get [options [type id]]
   (with-options options
-    (some-> (j/query (get-connection)
-                    [(str "SELECT * FROM " (name (get-options :doc-table))
-                          " WHERE _type = ? AND _id = ? LIMIT 1") (name type) id])
-           (first)
-           (from-db-row))))
+    (some->> (honeysql/merge-where (base-sqlmap type) [:= :_id id])
+             (sql/format)
+             (j/query (get-connection))
+             (first)
+             (from-db-row))))
