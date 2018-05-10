@@ -72,20 +72,16 @@ Additionally, a GIN index can be created to speed up queries on all fields.
 
 ```clojure
 ##
-(require '[docufant.db :as dfdb])
+(require '[docufant.core :as doc])
 
 
-;; Create a GIN index across all document types.
-(dfdb/create-index! db-spec {:index-type :gin
-                             :type nil})
-
-
-;; Ensure all Staff have unique email addresses.
-(dfdb/create-index! db-spec {:type :staff
-                             :path [:contact :email]
-                             :unique true})
-
+(doc/init! db-spec 
+           ;; Add a GIN index to generally speed things up.
+           {:index-type :gin :type nil}
+           ;; Ensure all Staff have unique email addresses.
+           {:type :staff :path [:contact :email] :unique true})
 ```
+
 
 ## Document Links
 

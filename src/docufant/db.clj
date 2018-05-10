@@ -48,14 +48,23 @@
 (defmethod index-target :gin [{:keys [gin-type]}] {:using (sql/raw "gin(_data jsonb_ops)")})
 
 
-(defn build-index
-  "Formats the SQL for the given index."
+(defn build-index-map
+  "Builds the HoneySQL map for the given index."
   [{:keys [unique path type as] :as index}]
   {:create-index (merge {:name (sql/raw (indexname index))
                          :on (get-options :doc-table)
                          :unique unique}
                         (index-target index))
    :where (if type [:= :_type (name type)] true)})
+
+
+(defn build-index [idx]
+  "Generates the raw SQL for a given index."
+  (-> idx
+      (build-index-map)
+      (sql/format :parameterizer :docufant-idx)
+      (first)
+      (list)))
 
 
 (defn create-tables!
@@ -81,6 +90,4 @@
     `docufant.postgres/format-cast`"
   [options index]
   (with-options options
-    (j/execute! (get-connection)
-               (-> (build-index index)
-                   (sql/format)))))
+    (j/execute! (get-connection) (build-index index))))

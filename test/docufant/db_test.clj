@@ -29,15 +29,15 @@
 
 (deftest test-indexes
   (with-options {}
-    (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS dfidx_docufant_p_p__uniq ON docufant ((_data #> ?)) WHERE TRUE"
-            (pg/text-array [:p :p])]
+    (is (= ["CREATE UNIQUE INDEX IF NOT EXISTS dfidx_docufant_p_p__uniq ON docufant ((_data #> '{p,p}')) WHERE TRUE"]
            (-> (db/build-index {:unique true
-                                          :path [:p :p]})
-               (sql/format))))
+                                :path [:p :p]}))))
 
-    (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant___gin__animal ON docufant USING gin(_data jsonb_ops) WHERE _type = ?"
-            "animal"]
+    (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant_p__animal ON docufant ((_data -> 'p')) WHERE _type = 'animal'"]
+           (-> (db/build-index {:type :animal
+                                :path [:p]}))))
+
+    (is (= ["CREATE INDEX IF NOT EXISTS dfidx_docufant___gin__animal ON docufant USING gin(_data jsonb_ops) WHERE _type = 'animal'"]
            (-> (db/build-index {:index-type :gin
-                                          :type :animal})
-               (sql/format))))
+                                :type :animal}))))
     ))

@@ -20,6 +20,11 @@
 (defalias <> operator/<>)
 
 
+(defn init! [options & indexes]
+  (db/create-tables! options)
+  (map db/create-index! indexes))
+
+
 (defn from-db-row [row]
   (let [id (:_id row)
         type (-> row

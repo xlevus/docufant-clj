@@ -8,14 +8,16 @@
 
 
 (def ^:dynamic *db-spec* {:dbtype "postgresql"
-              :dbname "docufant_test"
-              :user "docufant"
-              :password "password"})
+                          :dbname "docufant_test"
+                          :user "docufant"
+                          :password "password"
+                          :port 5433})
 
 
 (defn tables [f]
   ;;(db/transaction
-   (db/create-tables! *db-spec*)
+  (doc/init! *db-spec*
+             {:type :unique-name :unique true :path [:name]})
   (f)
   )
 

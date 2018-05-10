@@ -59,3 +59,6 @@
        ))
 
 (fmt/register-clause! :create-index 0)
+
+
+(fmt/register-parameterizer :docufant-idx #(str "'" % "'"))
