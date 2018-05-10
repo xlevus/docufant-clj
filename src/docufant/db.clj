@@ -26,8 +26,8 @@
   [(str "CREATE TABLE "
         (if (get-options :force-creation) nil "IF NOT EXISTS ")
         (name (get-options :link-table))
-        "(_left INTEGER REFERENCES " (name (get-options :doc-table)) "(_id), "
-        "_right INTEGER REFERENCES " (name (get-options :doc-table)) "(_id), "
+        "(_left INTEGER REFERENCES " (name (get-options :doc-table)) "(_id) ON DELETE CASCADE, "
+        "_right INTEGER REFERENCES " (name (get-options :doc-table)) "(_id) ON DELETE CASCADE, "
         "_linktype VARCHAR(100));"
         )])
 

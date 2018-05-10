@@ -108,3 +108,20 @@
       (is (= [i2] (doc/select *db-spec* nil :linked-to [:parent i1])))
       (is (= [i1] (doc/select *db-spec* nil :linked-to [:child i2])))
       )))
+
+
+(deftest test-removal
+  (testing "delete"
+    (let [i1 (doc/create! *db-spec* :test {:a 1})]
+      (is (= 1 (doc/delete! *db-spec* i1)))
+      (is (= nil (doc/get *db-spec* (:id i1))))
+      (is (= 0 (doc/delete! *db-spec* [:null 92929])))))
+
+  (testing "delete linked"
+    (let [i1 (doc/create! *db-spec* :test {:a 1})
+          i2 (doc/create! *db-spec* :test {:a 2})]
+      (doc/link! *db-spec* :linked i1 i2)
+
+      (is (= 1 (doc/delete! *db-spec* i1)))
+      (is (= nil (doc/get *db-spec* (:id i1))))
+      (is (= 0 (doc/delete! *db-spec* [:null 92929]))))))

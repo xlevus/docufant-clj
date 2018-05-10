@@ -131,3 +131,15 @@
              (j/query (get-connection))
              (first)
              (from-db-row))))
+
+
+(defn delete!
+  [options inst]
+  (with-options options
+    (let [[type id] (find-id inst)
+          sqlmap (-> (honeysql/delete-from (get-options :doc-table))
+                     (honeysql/merge-where [:= :_id id]))]
+      (->> sqlmap
+           (sql/format)
+           (j/execute! (get-connection))
+           (first)))))
