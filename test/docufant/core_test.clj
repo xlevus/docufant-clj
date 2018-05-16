@@ -11,7 +11,7 @@
                           :dbname "docufant_test"
                           :user "docufant"
                           :password "password"
-                          :port 5433})
+                          :port 5432})
 
 
 (defn tables [f]
@@ -19,6 +19,8 @@
   (doc/init! *db-spec*
              {:type :unique-name :unique true :path [:name]})
   (f)
+  (j/execute! *db-spec* "DROP TABLE docufant CASCADE;")
+  (j/execute! *db-spec* "DROP TABLE docufant_link CASCADE;")
   )
 
 
