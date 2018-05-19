@@ -22,7 +22,8 @@
 
 (defn init! [options & indexes]
   (db/create-tables! options)
-  (map db/create-index! indexes))
+  (doseq [idx indexes]
+    (db/create-index! options idx)))
 
 
 (defn from-db-row [row]
