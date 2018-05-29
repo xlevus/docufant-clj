@@ -11,4 +11,11 @@
 
   :plugins [[lein-codox "0.10.3"]]
   :codox {:metadata {:doc/format :markdown}}
-  :profiles {:test {:plugins [[com.jakemccrary/lein-test-refresh "0.19.0"]]}})
+  :profiles {:dev {:dependencies [[midje "1.9.1"]]}
+             :benchmark {:dependencies [[org.clojure/tools.nrepl "0.2.12"]
+                                        [org.clojure/test.check "0.9.0"]]
+                         :source-paths ["benchmark"]
+                         :main docufant.benchmark
+                         :repl-options {:init-ns docufant.benchmark}}}
+
+  )

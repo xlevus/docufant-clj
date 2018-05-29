@@ -98,6 +98,31 @@ these relationships.
 ```
 
 
+## Benchmarks
+
+A trivial benchmark script has been written. At the moment, it just tests a simple three-column table.
+
+The benchmark can be run with:
+
+```bash
+lein with-profile +benchmark run
+```
+
+### Results:
+
+| Engine   | Indexes | Benchmark           | Time (ms) |
++----------|---------|---------------------|-----------|
+| Docufant | No      | Insert 10k Rows     | 109389.13 |
+| Docufant | No      | Select butchers     |     68.92 |
+| Docufant | No      | Select old butchers |     48.89 |
+| SQL      | No      | Insert 10k Rows     |  68324.54 |
+| SQL      | No      | Select butchers     |     24.53 |
+| SQL      | No      | Select old butchers |     13.99 |
+| Docufant | Yes     | Select butchers     |     51.82 |
+| Docufant | Yes     | Select old butchers |     37.74 |
+| SQL      | Yes     | Select butchers     |     15.37 |
+| SQL      | Yes     | Select old butchers |     14.97 |
+
 ## TODO
 
 * Documentation
