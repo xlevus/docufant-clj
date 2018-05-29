@@ -100,28 +100,32 @@ these relationships.
 
 ## Benchmarks
 
-A trivial benchmark script has been written. At the moment, it just tests a simple three-column table.
-
-The benchmark can be run with:
+A trivial benchmark script can be run with:
 
 ```bash
 lein with-profile +benchmark run
 ```
 
+The benchmark creates a number of people, each of which have 1 main widget, and 10 other widgets.
+
+In the Docufant benchmark, primary widgets are stored in the person table, whereas in SQL they're
+kept in the widgets table.
+
+
 ### Results:
 
-| Engine   | Indexes | Benchmark           | Time (ms) |
-+----------|---------|---------------------|-----------|
-| Docufant | No      | Insert 10k Rows     | 109389.13 |
-| Docufant | No      | Select butchers     |     68.92 |
-| Docufant | No      | Select old butchers |     48.89 |
-| SQL      | No      | Insert 10k Rows     |  68324.54 |
-| SQL      | No      | Select butchers     |     24.53 |
-| SQL      | No      | Select old butchers |     13.99 |
-| Docufant | Yes     | Select butchers     |     51.82 |
-| Docufant | Yes     | Select old butchers |     37.74 |
-| SQL      | Yes     | Select butchers     |     15.37 |
-| SQL      | Yes     | Select old butchers |     14.97 |
+| Benchmark                                                            | Engine   | Time (ms) |
+|----------------------------------------------------------------------|----------|----------:|
+| Create Tables                                                        | Docufant |     59.82 |
+|                                                                      | SQL      |     24.49 |
+| Create 1k people & 10k widgets                                       | Docufant |  21237.02 |
+|                                                                      | SQL      |  14553.90 |
+| Select all butchers & primary widgets (ordered by age descending)    | Docufant |     22.58 |
+|                                                                      | SQL      |     11.57 |
+| Above, but older than 50                                             | Docufant |     11.94 |
+|                                                                      | SQL      |     10.89 |
+| Select widgets for 10 people value > 0, weight > 0, secondary = True | Docufant |    110.45 |
+|                                                                      | SQL      |    437.10 |
 
 ## TODO
 
